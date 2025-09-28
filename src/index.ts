@@ -64,7 +64,7 @@ server.tool(
   async ({ startDate, endDate, category }: { startDate: string; endDate: string; category: string }): Promise<any> => {
     try {
       const dateRange = validateInput(DateRangeSchema, { startDate, endDate });
-      const metrics = await rizeApi.getFocusMetrics(
+      const metrics = await rizeApi.getSummaries(
         dateRange.startDate,
         dateRange.endDate
       );
@@ -198,7 +198,7 @@ server.tool(
   async ({ date, includeBreakdown }: { date: string; includeBreakdown: boolean }): Promise<any> => {
     try {
       const validatedDate = validateInput(z.string().refine(d => !isNaN(Date.parse(d))), date);
-      const metrics = await rizeApi.getFocusMetrics(validatedDate, validatedDate);
+      const metrics = await rizeApi.getSummaries(validatedDate, validatedDate);
       const sessions = await rizeApi.getFocusSessions(validatedDate);
       if (metrics.length === 0) {
         return {

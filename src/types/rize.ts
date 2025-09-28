@@ -30,7 +30,10 @@ export interface RizeProductivityMetrics {
   totalFocusTime: number;
   productivityScore: number;
   focusSessionsCount: number;
-  topCategory: string;
+  topCategory: {
+    name: string;
+    timeSpent: number;
+  };
   breakTime: number;
   distractionTime: number;
   contextSwitches: number;

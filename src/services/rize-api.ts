@@ -33,6 +33,7 @@ export class RizeApiService {
       }
     `;
     const response: any = await this.client.request(query);
+    console.log('API Response getCurrentUser:', JSON.stringify(response, null, 2));
     const user = response.currentUser;
     this.cache.set(cacheKey, user);
     return user;
@@ -67,6 +68,7 @@ export class RizeApiService {
       first: limit,
       after: cursor
     });
+    console.log('API Response getProjects:', JSON.stringify(response, null, 2));
     const projects = response.projects.edges.map((edge: any) => edge.node);
     const hasNextPage = response.projects.pageInfo.hasNextPage;
     const nextCursor = response.projects.pageInfo.endCursor;
@@ -101,62 +103,126 @@ export class RizeApiService {
         }
       }
     });
+    console.log('API Response createProject:', JSON.stringify(response, null, 2));
     return response.createProject.project;
   }
 
-  public generateSimulatedMetrics(startDate: string, endDate: string): RizeProductivityMetrics[] {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const metrics: RizeProductivityMetrics[] = [];
-    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-      metrics.push({
-        date: date.toISOString().split('T')[0],
-        totalFocusTime: Math.floor(Math.random() * 480) + 120, // 2-10 hours
-        productivityScore: Math.floor(Math.random() * 40) + 60, // 60-100
-        focusSessionsCount: Math.floor(Math.random() * 12) + 3, // 3-15 sessions
-        topCategory: ['Development', 'Design', 'Research', 'Communication'][Math.floor(Math.random() * 4)],
-        breakTime: Math.floor(Math.random() * 120) + 30, // 30-150 minutes
-        distractionTime: Math.floor(Math.random() * 90) + 10, // 10-100 minutes
-        contextSwitches: Math.floor(Math.random() * 25) + 5 // 5-30 switches
-      });
-    }
-    return metrics;
-  }
 
-  public generateSimulatedFocusSessions(startDate: string): RizeFocusSession[] {
-    const sessions: RizeFocusSession[] = [];
-    const applications = ['VS Code', 'Figma', 'Chrome', 'Slack', 'Notion'];
-    const categories = ['Development', 'Design', 'Research', 'Communication'];
-    for (let i = 0; i < 10; i++) {
-      const startTime = new Date(startDate);
-      startTime.setHours(9 + Math.floor(Math.random() * 8));
-      startTime.setMinutes(Math.floor(Math.random() * 60));
-      const duration = Math.floor(Math.random() * 180) + 15; // 15-195 minutes
-      const endTime = new Date(startTime);
-      endTime.setMinutes(endTime.getMinutes() + duration);
-      sessions.push({
-        id: `session-${i}`,
-        userId: 'user-1',
-        projectId: Math.random() > 0.5 ? 'project-1' : undefined,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        duration,
-        focusScore: Math.floor(Math.random() * 40) + 60,
-        category: categories[Math.floor(Math.random() * categories.length)],
-        application: applications[Math.floor(Math.random() * applications.length)],
-        title: `Focus Session ${i + 1}`,
-        isActive: false
-      });
-    }
-    return sessions;
-  }
+  async getSummaries(startDate: string, endDate: string): Promise<RizeProductivityMetrics[]> {
+    try {
+      const query = gql`
+        query GetSummaries($startDate: ISO8601Date!, $endDate: ISO8601Date!, $bucketSize: String!) {
+          summaries(startDate: $startDate, endDate: $endDate, bucketSize: $bucketSize, includeCategories: true) {
+            buckets {
+              date
+              focusTime
+              breakTime
+              meetingTime
+              trackedTime
+              categories {
+                category {
+                  name
+                  idle
+                  focus
+                  work
+                }
+                timeSpent
+              }
+            }
+            focusTime
+            breakTime
+            meetingTime
+            trackedTime
+            workHours
+          }
+        }
+      `;
 
-  async getFocusMetrics(startDate: string, endDate: string): Promise<RizeProductivityMetrics[]> {
-    return this.generateSimulatedMetrics(startDate, endDate);
+      const response: any = await this.client.request(query, {
+        startDate,
+        endDate,
+        bucketSize: "day"
+      });
+
+      console.log('API Response getSummaries:', JSON.stringify(response, null, 2));
+
+      // Mappa i dati dell'API ai nostri tipi
+      // NOTA: I valori dell'API sono in SECONDI, convertiamo in minuti
+      const buckets = response.summaries?.buckets || [];
+      return buckets.map((bucket: any) => {
+        // Trova la categoria con più tempo
+        const topCategory = bucket.categories && bucket.categories.length > 0
+          ? (() => {
+              const topCat = bucket.categories.reduce((prev: any, curr: any) =>
+                curr.timeSpent > prev.timeSpent ? curr : prev
+              );
+              // Restituisci un oggetto con nome e timeSpent
+              return { name: topCat.category.name, timeSpent: Math.floor(topCat.timeSpent / 60) };
+            })()
+          : 'Work';
+
+        return {
+          date: bucket.date,
+          totalFocusTime: Math.floor((bucket.focusTime || 0) / 60), // Converti secondi in minuti
+          productivityScore: bucket.focusTime && bucket.trackedTime ?
+            Math.round((bucket.focusTime / bucket.trackedTime) * 100) : 0,
+          focusSessionsCount: 0, // Non disponibile nei bucket
+          topCategory,
+          breakTime: Math.floor((bucket.breakTime || 0) / 60), // Converti secondi in minuti
+          distractionTime: Math.floor((bucket.meetingTime || 0) / 60), // Usiamo meetingTime come distraction
+          contextSwitches: 0 // Non disponibile
+        };
+      });
+    } catch (error) {
+      console.warn('getSummaries: API error, returning empty array:', error);
+      return [];
+    }
   }
 
   async getFocusSessions(startDate: string): Promise<RizeFocusSession[]> {
-    return this.generateSimulatedFocusSessions(startDate);
+    try {
+      const query = gql`
+        query GetSessions($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
+          sessions(startTime: $startTime, endTime: $endTime, statuses: ["active"]) {
+            id
+            startTime
+            endTime
+            title
+          }
+        }
+      `;
+
+      // Calcola endTime come fine della giornata
+      const endDateTime = new Date(startDate);
+      endDateTime.setHours(23, 59, 59, 999);
+
+      const response: any = await this.client.request(query, {
+        startTime: startDate,
+        endTime: endDateTime.toISOString()
+      });
+
+      console.log('API Response getFocusSessions:', JSON.stringify(response, null, 2));
+
+      // Se ci sono sessioni, mappale ai nostri tipi (calcolando duration)
+      const sessions = response.sessions || [];
+      return sessions.map((session: any) => ({
+        id: session.id,
+        userId: '', // Non disponibile nell'API
+        projectId: undefined, // Non disponibile nell'API
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: session.endTime && session.startTime ?
+          Math.floor((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60)) : 0,
+        focusScore: 0, // Non disponibile nell'API
+        category: 'Unknown', // Non disponibile nell'API
+        application: 'Unknown', // Non disponibile nell'API
+        title: session.title,
+        isActive: false // Non disponibile nell'API
+      }));
+    } catch (error) {
+      console.warn('getFocusSessions: API error, returning empty array:', error);
+      return [];
+    }
   }
 
   async getAnalytics(
@@ -166,44 +232,63 @@ export class RizeApiService {
     const cacheKey = `analytics-${timeframe}-${includeInsights}`;
     const cached = this.cache.get<RizeAnalytics>(cacheKey);
     if (cached) return cached;
-    const query = gql`
-      query GetAnalytics($timeframe: String!, $includeInsights: Boolean!) {
-        analytics(timeframe: $timeframe, includeInsights: $includeInsights) {
-          timeframe
-          metrics {
-            date
-            totalFocusTime
-            productivityScore
-            focusSessionsCount
-            topCategory
-            breakTime
-            distractionTime
-            contextSwitches
-          }
-          insights {
-            id
-            type
-            title
-            description
-            priority
-            category
-            timestamp
-            metadata
-          }
-          trends {
-            focusTime
-            productivityScore
-            consistency
-          }
-        }
+
+    try {
+      // Calcola le date basandosi sul timeframe
+      const now = new Date();
+      let startDate: string, endDate: string;
+
+      switch (timeframe) {
+        case 'day':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0];
+          endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0];
+          break;
+        case 'week':
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - now.getDay());
+          startDate = weekStart.toISOString().split('T')[0];
+          endDate = now.toISOString().split('T')[0];
+          break;
+        case 'month':
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          startDate = monthStart.toISOString().split('T')[0];
+          endDate = monthEnd.toISOString().split('T')[0];
+          break;
       }
-    `;
-    const response: any = await this.client.request(query, {
-      timeframe,
-      includeInsights
-    });
-    const analytics = response.analytics;
-    this.cache.set(cacheKey, analytics);
-    return analytics;
+
+      // Usa getSummaries per ottenere i dati (stessa API, meno duplicazioni)
+      const metrics = await this.getSummaries(startDate, endDate);
+
+      // Costruisci l'oggetto analytics
+      const analytics: RizeAnalytics = {
+        timeframe,
+        metrics,
+        insights: [], // Per ora vuoto, da implementare se disponibile
+        trends: {
+          focusTime: metrics.reduce((sum: number, m: RizeProductivityMetrics) => sum + m.totalFocusTime, 0),
+          productivityScore: metrics.length > 0 ? metrics.reduce((sum: number, m: RizeProductivityMetrics) => sum + m.productivityScore, 0) / metrics.length : 0,
+          consistency: 0 // Da calcolare se necessario
+        }
+      };
+
+      this.cache.set(cacheKey, analytics);
+      return analytics;
+    } catch (error) {
+      console.warn('getAnalytics: API error, returning empty structure:', error);
+      const analytics: RizeAnalytics = {
+        timeframe,
+        metrics: [],
+        insights: [],
+        trends: {
+          focusTime: 0,
+          productivityScore: 0,
+          consistency: 0
+        }
+      };
+
+      this.cache.set(cacheKey, analytics);
+      return analytics;
+    }
   }
 }

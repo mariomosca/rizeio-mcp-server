@@ -12,6 +12,9 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "jest",
+    "test:api": "tsx test-api.ts",
+    "test:simple": "tsx test-simple.ts",
+    "test:conversion": "tsx test-conversion.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "inspector": "npx @modelcontextprotocol/inspector dist/index.js"
