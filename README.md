@@ -212,7 +212,7 @@ src/
 ### **Health Check System**
 ```bash
 # Test server health
-curl -X POST "http://localhost:3000/health" 
+npm run health-check
 
 # Response includes:
 # - API connectivity status
@@ -320,3 +320,5 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 ---
 
 **Built with ⚡ by [Mario Mosca](https://mariomosca.com) - Demonstrating enterprise-grade AI integration architecture**
+
+[![AI Pair Programming](https://img.shields.io/badge/Built%20with%20❤️%20using-AI%20Pair%20Programming-ff69b4?style=for-the-badge&logo=sparkles&logoColor=white)](https://mariomosca.com)
