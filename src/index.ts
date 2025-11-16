@@ -63,11 +63,14 @@ server.tool(
   },
   async ({ startDate, endDate, category }: { startDate: string; endDate: string; category: string }): Promise<any> => {
     try {
+      logger.debug('Input dates', { startDate, endDate, category });
       const dateRange = validateInput(DateRangeSchema, { startDate, endDate });
+      logger.debug('Validated dates', dateRange);
       const metrics = await rizeApi.getSummaries(
         dateRange.startDate,
         dateRange.endDate
       );
+      logger.debug('Metrics retrieved', { count: metrics.length });
       return {
         content: [{
           type: 'text',

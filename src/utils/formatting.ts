@@ -11,11 +11,40 @@ export function formatDuration(minutes: number): string {
 }
 
 export function formatDate(dateString: string): string {
-  return format(parseISO(dateString), 'yyyy-MM-dd');
+  try {
+    const isoDate = convertRizeDateToISO(dateString);
+    return format(parseISO(isoDate), 'yyyy-MM-dd');
+  } catch (error) {
+    return 'Invalid Date';
+  }
 }
 
 export function formatDateTime(dateString: string): string {
-  return format(parseISO(dateString), 'yyyy-MM-dd HH:mm:ss');
+  try {
+    const isoDate = convertRizeDateToISO(dateString);
+    return format(parseISO(isoDate), 'yyyy-MM-dd HH:mm:ss');
+  } catch (error) {
+    return 'Invalid DateTime';
+  }
+}
+
+// Converte formato Rize.io "2025-09-05 04:00:00 +0200" in ISO 8601 "2025-09-05T04:00:00+02:00"
+function convertRizeDateToISO(dateString: string): string {
+  if (!dateString || typeof dateString !== 'string') {
+    throw new Error('Invalid date string');
+  }
+
+  // Formato Rize.io: "2025-09-05 04:00:00 +0200"
+  // Formato ISO: "2025-09-05T04:00:00+02:00"
+
+  // Sostituisci spazio con T
+  let isoDate = dateString.replace(' ', 'T');
+
+  // Se c'è un timezone offset come "+0200", sostituiscilo con "+02:00"
+  // Regex: cattura il segno (+ o -) e le 4 cifre del timezone
+  isoDate = isoDate.replace(/([+-])(\d{2})(\d{2})$/, '$1$2:$3');
+
+  return isoDate;
 }
 
 export function formatProductivityMetrics(metrics: RizeProductivityMetrics[]): string {
@@ -31,8 +60,8 @@ export function formatProductivityMetrics(metrics: RizeProductivityMetrics[]): s
   formatted += `📈 Total Focus Sessions: ${totalSessions}\n\n`;
   formatted += `📅 Daily Breakdown:\n`;
   metrics.forEach(metric => {
-    formatted += `• ${formatDate(metric.date)}: ${formatDuration(metric.totalFocusTime)} focus time, `;
-    formatted += `${metric.productivityScore}/100 score, ${metric.focusSessionsCount} sessions\n`;
+    formatted += `• ${metric.date}: ${formatDuration(metric.totalFocusTime)} focus time, `;
+    formatted += `${metric.productivityScore}/100 score, ${metric.focusSessionsCount} focus sessions\n`;
   });
   return formatted;
 }

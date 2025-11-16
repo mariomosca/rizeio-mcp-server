@@ -33,7 +33,8 @@ export class RizeApiService {
       }
     `;
     const response: any = await this.client.request(query);
-    console.log('API Response getCurrentUser:', JSON.stringify(response, null, 2));
+    // Log strutturato per debug (solo se necessario)
+    // console.log('API Response getCurrentUser:', JSON.stringify(response, null, 2));
     const user = response.currentUser;
     this.cache.set(cacheKey, user);
     return user;
@@ -68,7 +69,8 @@ export class RizeApiService {
       first: limit,
       after: cursor
     });
-    console.log('API Response getProjects:', JSON.stringify(response, null, 2));
+    // Log strutturato per debug (solo se necessario)
+    // console.log('API Response getProjects:', JSON.stringify(response, null, 2));
     const projects = response.projects.edges.map((edge: any) => edge.node);
     const hasNextPage = response.projects.pageInfo.hasNextPage;
     const nextCursor = response.projects.pageInfo.endCursor;
@@ -103,7 +105,8 @@ export class RizeApiService {
         }
       }
     });
-    console.log('API Response createProject:', JSON.stringify(response, null, 2));
+    // Log strutturato per debug (solo se necessario)
+    // console.log('API Response createProject:', JSON.stringify(response, null, 2));
     return response.createProject.project;
   }
 
@@ -144,29 +147,39 @@ export class RizeApiService {
         bucketSize: "day"
       });
 
-      console.log('API Response getSummaries:', JSON.stringify(response, null, 2));
-
       // Mappa i dati dell'API ai nostri tipi
       // NOTA: I valori dell'API sono in SECONDI, convertiamo in minuti
       const buckets = response.summaries?.buckets || [];
       return buckets.map((bucket: any) => {
         // Trova la categoria con più tempo
-        const topCategory = bucket.categories && bucket.categories.length > 0
-          ? (() => {
-              const topCat = bucket.categories.reduce((prev: any, curr: any) =>
-                curr.timeSpent > prev.timeSpent ? curr : prev
-              );
-              // Restituisci un oggetto con nome e timeSpent
-              return { name: topCat.category.name, timeSpent: Math.floor(topCat.timeSpent / 60) };
-            })()
-          : 'Work';
+        let topCategory: any = 'Work';
+        let focusSessionsCount = 0;
+
+        if (bucket.categories && bucket.categories.length > 0) {
+          const topCat = bucket.categories.reduce((prev: any, curr: any) =>
+            curr.timeSpent > prev.timeSpent ? curr : prev
+          );
+          topCategory = {
+            name: topCat.category.name,
+            timeSpent: Math.floor(topCat.timeSpent / 60),
+            focus: topCat.category.focus
+          };
+
+          // Se la top category ha focus true, consideriamo che c'è stata almeno una sessione di focus
+          if (topCat.category.focus === true) {
+            // Possiamo stimare il numero di sessioni di focus come 1 per ora di topCategory.timeSpent, oppure semplicemente 1 se > 0
+            focusSessionsCount = topCat.timeSpent > 0 ? 1 : 0;
+          } else {
+            focusSessionsCount = 0;
+          }
+        }
 
         return {
           date: bucket.date,
           totalFocusTime: Math.floor((bucket.focusTime || 0) / 60), // Converti secondi in minuti
           productivityScore: bucket.focusTime && bucket.trackedTime ?
             Math.round((bucket.focusTime / bucket.trackedTime) * 100) : 0,
-          focusSessionsCount: 0, // Non disponibile nei bucket
+          focusSessionsCount, // Basato su topCategory.focus
           topCategory,
           breakTime: Math.floor((bucket.breakTime || 0) / 60), // Converti secondi in minuti
           distractionTime: Math.floor((bucket.meetingTime || 0) / 60), // Usiamo meetingTime come distraction
@@ -174,7 +187,6 @@ export class RizeApiService {
         };
       });
     } catch (error) {
-      console.warn('getSummaries: API error, returning empty array:', error);
       return [];
     }
   }
@@ -201,7 +213,8 @@ export class RizeApiService {
         endTime: endDateTime.toISOString()
       });
 
-      console.log('API Response getFocusSessions:', JSON.stringify(response, null, 2));
+      // Log strutturato per debug (solo se necessario)
+      // console.log('API Response getFocusSessions:', JSON.stringify(response, null, 2));
 
       // Se ci sono sessioni, mappale ai nostri tipi (calcolando duration)
       const sessions = response.sessions || [];
@@ -220,7 +233,6 @@ export class RizeApiService {
         isActive: false // Non disponibile nell'API
       }));
     } catch (error) {
-      console.warn('getFocusSessions: API error, returning empty array:', error);
       return [];
     }
   }
@@ -275,7 +287,6 @@ export class RizeApiService {
       this.cache.set(cacheKey, analytics);
       return analytics;
     } catch (error) {
-      console.warn('getAnalytics: API error, returning empty structure:', error);
       const analytics: RizeAnalytics = {
         timeframe,
         metrics: [],
