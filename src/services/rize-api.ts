@@ -81,16 +81,14 @@ export class RizeApiService {
     };
   }
 
-  async createProject(name: string, description?: string): Promise<RizeProject> {
+  async createProject(name: string): Promise<RizeProject> {
     const mutation = gql`
       mutation CreateProject($input: CreateProjectInput!) {
         createProject(input: $input) {
           project {
             id
             name
-            description
             color
-            isArchived
             createdAt
             updatedAt
           }
@@ -100,13 +98,10 @@ export class RizeApiService {
     const response: any = await this.client.request(mutation, {
       input: {
         args: {
-          name,
-          description
+          name
         }
       }
     });
-    // Log strutturato per debug (solo se necessario)
-    // console.log('API Response createProject:', JSON.stringify(response, null, 2));
     return response.createProject.project;
   }
 

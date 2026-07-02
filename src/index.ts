@@ -173,12 +173,11 @@ server.tool(
 server.tool(
   'create_project',
   {
-    name: z.string().min(1).max(100).describe('Project name'),
-    description: z.string().optional().describe('Project description')
+    name: z.string().min(1).max(100).describe('Project name')
   },
-  async ({ name, description }: { name: string; description?: string }): Promise<any> => {
+  async ({ name }: { name: string }): Promise<any> => {
     try {
-      const project = await rizeApi.createProject(name, description);
+      const project = await rizeApi.createProject(name);
       return {
         content: [{
           type: 'text',
@@ -186,7 +185,7 @@ server.tool(
         }]
       };
     } catch (error) {
-      logger.error('Failed to create project', { error: (error as Error).message, name, description });
+      logger.error('Failed to create project', { error: (error as Error).message, name });
       throw error;
     }
   }

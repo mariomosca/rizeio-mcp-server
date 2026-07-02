@@ -126,7 +126,7 @@ class RizeApiTester {
   async testCreateProject() {
     console.log('🆕 Testing createProject...');
     try {
-      const project = await this.api.createProject('Test Project', 'Created during testing');
+      const project = await this.api.createProject('Test Project');
       console.log('✅ createProject success:', project);
     } catch (error) {
       console.log('❌ createProject failed (expected with invalid API key):', error.message);
